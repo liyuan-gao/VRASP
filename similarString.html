@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="libs/jquery-3.3.1.min.js"></script>
+    <script src="libs/fuzzyset.js"></script>
+
+</head>
+<body>
+
+</body>
+<script>
+    const stopwords = ["of", "the", "a", "an", "any", "is", "can", "who", "what","why"];
+    const editor ="sorts\n" +
+        "    #people = {tommy, alex, john, daniel, sarah, peter, lino}.\n" +
+        "    #gender = {male, female}.\n" +
+        "predicates\n" +
+        "    advisor(#people, #people).\n" +
+        "    friend(#people, #people).\n" +
+        "    gender(#people,#gender).\n" +
+        "    spanish(#people).\n" +
+        "rules\n" +
+        "    advisor(tommy, alex).\n" +
+        "    advisor(tommy, john).\n" +
+        "    advisor(tommy, daniel).\n" +
+        "    advisor(tommy, lino).\n" +
+        "    friend(lino, alex).\n" +
+        "    friend(lino, peter).\n" +
+        "    friend(sarah, alex).\n" +
+        "    gender(tommy,male).\n" +
+        "    gender(lino,male).\n" +
+        "    gender(sarah, female).\n" +
+        "    spanish(lino).";
+    var sorts ={};
+    sorts["peole"] = ["tommy", "alex", "john", "sarah", "peter", "daniel", "lino"];
+    sorts["gender"] = ["male","female"];
+    var predicates ={};
+        predicates["advisor"]={};
+        predicates["gender"]={};
+        predicates["spanish"]={};
+
+    for(let p1 of sorts["peole"]){
+        for(let p2 of sorts["peole"]){
+            if(!predicates["advisor"].hasOwnProperty(p1 + " advisor "+ p2)){
+                predicates["advisor"][p1 + " advisor "+ p2] = "advisor("+p1+","+p2+")";
+            }
+            if(!predicates["advisor"].hasOwnProperty("advisor "+ p2)){
+                predicates["advisor"]["advisor "+ p2] = "advisor(X,"+p2+")";
+            }
+            if(!predicates["advisor"].hasOwnProperty(p1+" advisor")){
+                predicates["advisor"][p1 +" advisor"] = "advisor("+p1+",X)";
+            }
+        }
+    }
+
+
+
+    for(let p1 of sorts["peole"]){
+        for(let p2 of sorts["gender"]){
+            if(!predicates["gender"].hasOwnProperty(p1 + " gender "+ p2)){
+                predicates["gender"][p1 + " gender "+ p2] = "gender("+p1+","+p2+")";
+            }
+            if(!predicates["gender"].hasOwnProperty("gender "+ p2)){
+                predicates["gender"]["gender "+ p2] = "gender(X,"+p2+")";
+            }
+            if(!predicates["gender"].hasOwnProperty(p1+" gender")){
+                predicates["gender"][p1 +" gender"] = "gender("+p1+",X)";
+            }
+        }
+    }
+    //
+    for(let p1 of sorts["peole"]){
+
+            if(!predicates["spanish"].hasOwnProperty(p1 + " spanish")){
+                predicates["spanish"][p1 + " spanish"] = "spanish("+p1+")";
+            }
+        if(!predicates["spanish"].hasOwnProperty("spanish")){
+            predicates["spanish"]["spanish"] = "spanish(X)";
+        }
+
+    }
+
+    var all_predicates = [];
+    for(var key1 in predicates){
+        if(predicates.hasOwnProperty(key1)){
+            for(var key2 in predicates[key1]){
+                if(predicates[key1].hasOwnProperty(key2))
+                    all_predicates.push(key2);
+            }
+        }
+
+    }
+
+    a = FuzzySet(all_predicates);
+
+    var synth = window.speechSynthesis;
+    var SpeechRecognition = SpeechRecognition || webkitSpeechRecognition;
+    var recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+
+    $(document).keypress(function (e) {
+        if (e.which == 13) {
+            ListeningMode();
+        }
+    });
+    function ListeningMode() {
+        recognition.start();
+    }
+    recognition.onresult = function (event) {
+        // The SpeechRecognitionEvent results property returns a SpeechRecognitionResultList object
+        // The SpeechRecognitionResultList object contains SpeechRecognitionResult objects.
+        // It has a getter so it can be accessed like an array
+        // The [last] returns the SpeechRecognitionResult at the last position.
+        // Each SpeechRecognitionResult object contains SpeechRecognitionAlternative objects that contain individual results.
+        // These also have getters so they can be accessed like arrays.
+        // The [0] returns the SpeechRecognitionAlternative at position 0.
+        // We then return the transcript property of the SpeechRecognitionAlternative object
+
+        var last = event.results.length - 1;
+        var transcript = event.results[last][0].transcript;
+
+        
+        var trim_script = transcript.split(" ");
+        trim_script = trim_script.filter(f=>!stopwords.includes(f));
+
+        var result = a.get(trim_script.join(" "),null,0.5);
+        // console.log(a.get(transcript,null,0.5));
+        // console.log(a.get(transcript,null,0.5)[0][1]);
+
+        for(var key1 in predicates){
+            if(predicates.hasOwnProperty(key1)){
+                for(var key2 in predicates[key1]){
+                    if(predicates[key1].hasOwnProperty(key2))
+                        if(result[0][1]==key2){
+                            console.log(predicates[key1][key2]);
+
+                            var utterThis = new SpeechSynthesisUtterance(key2);
+                            synth.speak(utterThis);
+
+                            var data = {
+                                'action': "getQuery",
+                                'query': predicates[key1][key2],
+                                'editor': editor
+                            };
+
+                            // Expected response : answer sets
+                            $.post("http://wave.ttu.edu/ajax.php", data, function (response) {
+                                 var pre_string = "The answer to your question "+transcript+" is ";
+                                //Speaking(response.replace(/<[^>]*>/gm, ""));
+                                console.log(response);
+                                var html = document.createElement("html");
+                                html.innerHTML = response;
+                                console.log(html);
+                                Speaking(pre_string+ html.querySelector("p").textContent.replace(/X =/gm,""));
+
+                            });
+                        }
+                }
+            }
+
+        }
+    }
+    function Speaking(text) {
+        var utterThis = new SpeechSynthesisUtterance(text);
+        synth.speak(utterThis);
+    }
+</script>
+</html>
