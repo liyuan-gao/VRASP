@@ -15,6 +15,7 @@
     const editor ="sorts\n" +
         "    #people = {tommy, alex, john, daniel, sarah, peter, lino}.\n" +
         "    #gender = {male, female}.\n" +
+        "    #abc = {msale,sds,sdsds, female}.\n" +
         "predicates\n" +
         "    advisor(#people, #people).\n" +
         "    friend(#people, #people).\n" +
@@ -32,54 +33,89 @@
         "    gender(lino,male).\n" +
         "    gender(sarah, female).\n" +
         "    spanish(lino).";
+    // sorts
+    var contstring = editor.split("sorts\n")[1].split("predicates\n");
+    var sortstring =contstring[0].split('.');
+    sortstring.splice(-1,1);
     var sorts ={};
-    sorts["peole"] = ["tommy", "alex", "john", "sarah", "peter", "daniel", "lino"];
-    sorts["gender"] = ["male","female"];
+    sortstring = sortstring.map(d=>d.replace(/\n/g,'').trim()).forEach(d=>
+    {var par = d.split("=");
+    sorts[par[0].replace(/#/,'').trim()]= par[1].replace(/{|}/g,'').split(',').map(w=>w.trim())});
+    // predicates
     var predicates ={};
-        predicates["advisor"]={};
-        predicates["gender"]={};
-        predicates["spanish"]={};
-
-    for(let p1 of sorts["peole"]){
-        for(let p2 of sorts["peole"]){
-            if(!predicates["advisor"].hasOwnProperty(p1 + " advisor "+ p2)){
-                predicates["advisor"][p1 + " advisor "+ p2] = "advisor("+p1+","+p2+")";
-            }
-            if(!predicates["advisor"].hasOwnProperty("advisor "+ p2)){
-                predicates["advisor"]["advisor "+ p2] = "advisor(X,"+p2+")";
-            }
-            if(!predicates["advisor"].hasOwnProperty(p1+" advisor")){
-                predicates["advisor"][p1 +" advisor"] = "advisor("+p1+",X)";
-            }
-        }
-    }
-
-
-
-    for(let p1 of sorts["peole"]){
-        for(let p2 of sorts["gender"]){
-            if(!predicates["gender"].hasOwnProperty(p1 + " gender "+ p2)){
-                predicates["gender"][p1 + " gender "+ p2] = "gender("+p1+","+p2+")";
-            }
-            if(!predicates["gender"].hasOwnProperty("gender "+ p2)){
-                predicates["gender"]["gender "+ p2] = "gender(X,"+p2+")";
-            }
-            if(!predicates["gender"].hasOwnProperty(p1+" gender")){
-                predicates["gender"][p1 +" gender"] = "gender("+p1+",X)";
-            }
-        }
-    }
+    contstring = contstring[1].split("rules\n");
+    sortstring =contstring[0].split('.');
+    sortstring.splice(-1,1);
+    sortstring.forEach(d=>{
+        var part = d.replace(/\n/g,'').trim().split('(');
+        var func = part[0];
+        predicates[func]={};
+        var par = part[1].split(',').map(e=> e.replace(/#|\)/g,'').trim());
+        var par1 = sorts[par[0]].slice();
+        par1.push("X");
+        par.splice(-1,1);
+        par1.forEach(e=>{
+            var strinh = (e=='X'?'':(e +' '))+ func;
+            predicates[func][strinh] = func+"("+e+")";
+            console.log(par);
+            par.forEach(par2 => {
+                var temp = sorts[par2].slice();
+                temp.push("X");
+                temp.forEach(t => {
+                    var strinh = (e == 'X' ? '' : (e + ' ')) + func + (t == 'X' ? '' : (' ' + t));
+                    // if (strinh != func)
+                    predicates[func][strinh] = func + "(" + e + "," + t + ")";
+                })
+            });
+        });
+    })
+    // sorts["peole"] = ["tommy", "alex", "john", "sarah", "peter", "daniel", "lino"];
+    // sorts["gender"] = ["male","female"];
+    // var predicates ={};
+    //     predicates["advisor"]={};
+    //     predicates["gender"]={};
+    //     predicates["spanish"]={};
     //
-    for(let p1 of sorts["peole"]){
-
-            if(!predicates["spanish"].hasOwnProperty(p1 + " spanish")){
-                predicates["spanish"][p1 + " spanish"] = "spanish("+p1+")";
-            }
-        if(!predicates["spanish"].hasOwnProperty("spanish")){
-            predicates["spanish"]["spanish"] = "spanish(X)";
-        }
-
-    }
+    // for(let p1 of sorts["peole"]){
+    //     for(let p2 of sorts["peole"]){
+    //         if(!predicates["advisor"].hasOwnProperty(p1 + " advisor "+ p2)){
+    //             predicates["advisor"][p1 + " advisor "+ p2] = "advisor("+p1+","+p2+")";
+    //         }
+    //         if(!predicates["advisor"].hasOwnProperty("advisor "+ p2)){
+    //             predicates["advisor"]["advisor "+ p2] = "advisor(X,"+p2+")";
+    //         }
+    //         if(!predicates["advisor"].hasOwnProperty(p1+" advisor")){
+    //             predicates["advisor"][p1 +" advisor"] = "advisor("+p1+",X)";
+    //         }
+    //     }
+    // }
+    //
+    //
+    //
+    // for(let p1 of sorts["peole"]){
+    //     for(let p2 of sorts["gender"]){
+    //         if(!predicates["gender"].hasOwnProperty(p1 + " gender "+ p2)){
+    //             predicates["gender"][p1 + " gender "+ p2] = "gender("+p1+","+p2+")";
+    //         }
+    //         if(!predicates["gender"].hasOwnProperty("gender "+ p2)){
+    //             predicates["gender"]["gender "+ p2] = "gender(X,"+p2+")";
+    //         }
+    //         if(!predicates["gender"].hasOwnProperty(p1+" gender")){
+    //             predicates["gender"][p1 +" gender"] = "gender("+p1+",X)";
+    //         }
+    //     }
+    // }
+    // //
+    // for(let p1 of sorts["peole"]){
+    //
+    //         if(!predicates["spanish"].hasOwnProperty(p1 + " spanish")){
+    //             predicates["spanish"][p1 + " spanish"] = "spanish("+p1+")";
+    //         }
+    //     if(!predicates["spanish"].hasOwnProperty("spanish")){
+    //         predicates["spanish"]["spanish"] = "spanish(X)";
+    //     }
+    //
+    // }
 
     var all_predicates = [];
     for(var key1 in predicates){
