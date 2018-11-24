@@ -6,48 +6,82 @@
     <script src="https://aframe.io/releases/0.8.0/aframe.min.js"></script>
     <script src="libs/jquery-3.3.1.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.5.1/dist/aframe-look-at-component.min.js"></script>
+    <script src="libs/fuzzyset.js"></script>
 
-
-</head>
-<body>
-<a-scene>
-    <a-assets>
-        <a-asset-item id="harvest" src="assets/models/harvest/model.dae"></a-asset-item>
-        <a-asset-item id="house" src="assets/models/lighthouse/gltf.glb"></a-asset-item>
-        <a-asset-item id="monk" src="assets/models/monk/model.dae"></a-asset-item>
-        <a-asset-item id="cowgirl" src="assets/models/cowgirl/model.dae"></a-asset-item>
-        <a-asset-item id="kids" src="assets/models/kids/model.dae"></a-asset-item>
-    </a-assets>
-    <a-entity camera look-controls wasd-controls></a-entity>
-
-    <a-gltf-model position="0 -1 0" src="#house"></a-gltf-model>
-    <a-collada-model look-at="[camera]" position="-18 -1 -1.3" src="#monk"></a-collada-model>
-    <a-collada-model position="-23.699137807788514 -1.1669356758691327 1.4171717170095683" src="#harvest"></a-collada-model>
-    <a-collada-model look-at="[camera]" position="-23.699137807788514 -1 1.4171717170095683" src="#cowgirl"></a-collada-model>
-    <a-collada-model look-at="[camera]" position="-23.699 -1 -4" src="#kids"></a-collada-model>
-    <a-sky src="assets/skybox.jpg"></a-sky>
-</a-scene>
 <script>
+    var isClose=true;
+    const stopwords = ["of", "the", "a", "an", "any", "is", "can", "who", "what", "why"];
     const editor = "sorts\n" +
-        "    #people = {sara, bob, sam, john}.\n" +
+        "    #people = {tommy, alex, john, daniel, sarah, peter, lino}.\n" +
+        "    #gender = {male, female}.\n" +
+        "    #abc = {msale,sds,sdsds, female}.\n" +
         "predicates\n" +
-        "%father(X,Y) denotes that X is father of Y.\n" +
-        "    father(#people, #people).\n" +
-        "%mother(X,Y) denotes that X is mather of Y\n" +
-        "    mother(#people, #people).\n" +
-        "%parent(X,Y) denotes that X is parent of Y.\n" +
-        "    parent(#people, #people).\n" +
-        "%speak(X) denotes that X can speak\n" +
-        "    speak(#people).\n" +
+        "    advisor(#people, #people).\n" +
+        "    friend(#people, #people).\n" +
+        "    gender(#people,#gender).\n" +
+        "    spanish(#people).\n" +
         "rules\n" +
-        "    father(bob, sam).\n" +
-        "    father(john, sam).\n" +
-        "    parent(bob, john).\n"
-    const stopwords = ["of", "the", "a", "an", "any", "is", "can", "Is"];
-    const confirmedQuestion = ["is", "can"];
-    const questionList = ["what", "who", "whom", "whose", "where"];
-    var predicates = [];
-    extractPredicates(editor);
+        "    advisor(tommy, alex).\n" +
+        "    advisor(tommy, john).\n" +
+        "    advisor(tommy, daniel).\n" +
+        "    advisor(tommy, lino).\n" +
+        "    friend(lino, alex).\n" +
+        "    friend(lino, peter).\n" +
+        "    friend(sarah, alex).\n" +
+        "    gender(tommy,male).\n" +
+        "    gender(lino,male).\n" +
+        "    gender(sarah, female).\n" +
+        "    spanish(lino).";
+    // sorts
+    var contstring = editor.split("sorts\n")[1].split("predicates\n");
+    var sortstring = contstring[0].split('.');
+    sortstring.splice(-1, 1);
+    var sorts = {};
+    sortstring = sortstring.map(d => d.replace(/\n/g, '').trim()).forEach(d => {
+        var par = d.split("=");
+        sorts[par[0].replace(/#/, '').trim()] = par[1].replace(/{|}/g, '').split(',').map(w => w.trim())
+    });
+    // predicates
+    var predicates = {};
+    contstring = contstring[1].split("rules\n");
+    sortstring = contstring[0].split('.');
+    sortstring.splice(-1, 1);
+    sortstring.forEach(d => {
+        var part = d.replace(/\n/g, '').trim().split('(');
+        var func = part[0];
+        predicates[func] = {};
+        var par = part[1].split(',').map(e => e.replace(/#|\)/g, '').trim());
+        var par1 = sorts[par[0]].slice();
+        par1.push("X");
+        par.splice(-1, 1);
+        par1.forEach(e => {
+            var strinh = (e == 'X' ? '' : (e + ' ')) + func;
+            predicates[func][strinh] = func + "(" + e + ")";
+            par.forEach(par2 => {
+                var temp = sorts[par2].slice();
+                temp.push("X");
+                temp.forEach(t => {
+                    var strinh = (e == 'X' ? '' : (e + ' ')) + func + (t == 'X' ? '' : (' ' + t));
+                    // if (strinh != func)
+                    predicates[func][strinh] = func + "(" + e + "," + t + ")";
+                })
+            });
+        });
+    });
+
+
+    var all_predicates = [];
+    for (var key1 in predicates) {
+        if (predicates.hasOwnProperty(key1)) {
+            for (var key2 in predicates[key1]) {
+                if (predicates[key1].hasOwnProperty(key2))
+                    all_predicates.push(key2);
+            }
+        }
+
+    }
+
+    a = FuzzySet(all_predicates);
 
     var synth = window.speechSynthesis;
     var SpeechRecognition = SpeechRecognition || webkitSpeechRecognition;
@@ -63,38 +97,8 @@
         }
     });
 
-    function extractPredicates(editorL) {
-        var matches = editorL.match(/\%([^)]+)\)/gm);
-        matches.forEach(function (d) {
-            let predicate = d.match(/[a-z]+/gm);
-            let num_variable = d.match(/\(([^\)]+)\)/gm)[0].split(',').length;
-            let obj = {};
-            obj.name = predicate[0];
-            obj.arity = num_variable;
-            predicates.push(obj);
-        });
-    }
-
     function ListeningMode() {
         recognition.start();
-    }
-
-    function SpeakingMode(tts) {
-        var utterThis = new SpeechSynthesisUtterance(tts);
-        synth.speak(utterThis);
-        var query = processTranscript(tts);
-        console.log(query)
-        var data = {
-            'action': "getQuery",
-            'query': query,
-            'editor': editor
-        };
-
-        // Expected response : answer sets
-        $.post("http://wave.ttu.edu/ajax.php", data, function (response) {
-            Speaking(response.replace(/<[^>]*>/gm, ""));
-
-        });
     }
 
     recognition.onresult = function (event) {
@@ -109,62 +113,500 @@
 
         var last = event.results.length - 1;
         var transcript = event.results[last][0].transcript;
-        SpeakingMode(transcript);
-    }
-
-    function processTranscript(transcript) {
-        let query = "";
-        let temparr = transcript.toLowerCase().split(" "); //Convert to lowercase and split it
-        //Remove all stop words
-        temparr = temparr.filter(f => !stopwords.includes(f));
 
 
-        for (let p of predicates) {
-            for (let ps of temparr) {
-                if (p.name == ps) {
-                    //Check arity
-                    let arity = new Array(p.arity);
-                    //If it contain who, what, where, when
-                    var q = temparr.filter(f => questionList.includes(f));
-                    if (q.length > 0) {
-                        //get the index and compare position
-                        //Now filter the rest extract name
-                        let difference = temparr.filter(x => !questionList.includes(x));
-                        difference = difference.filter(x => ![ps].includes(x));
-                        console.log(difference);
-                        if (temparr.indexOf(q[0]) > temparr.indexOf(ps)) {
-                            arity[arity.length - 1] = "X";
-                            arity[0] = difference[0];
+        var trim_script = transcript.split(" ");
+        trim_script = trim_script.filter(f => !stopwords.includes(f));
+
+        var result = a.get(trim_script.join(" "), null, 0.5);
+
+
+        for (var key1 in predicates) {
+            if (predicates.hasOwnProperty(key1)) {
+                for (var key2 in predicates[key1]) {
+                    if (predicates[key1].hasOwnProperty(key2))
+                        if (result[0][1] == key2) {
+                            console.log(predicates[key1][key2]);
+
+                            var utterThis = new SpeechSynthesisUtterance(key2);
+                            synth.speak(utterThis);
+
+                            var data = {
+                                'action': "getQuery",
+                                'query': predicates[key1][key2],
+                                'editor': editor
+                            };
+
+                            // Expected response : answer sets
+                            $.post("http://wave.ttu.edu/ajax.php", data, function (response) {
+                                var pre_string = "The answer to your question " + transcript + " is ";
+                                console.log(response);
+                                var html = document.createElement("html");
+                                html.innerHTML = response;
+                                Speaking(pre_string + html.querySelector("p").textContent.replace(/X =/gm, ""));
+
+                            });
                         }
-                        else {
-                            arity[0] = "X";
-                            arity[arity.length - 1] = difference[0];
-
-                        }
-                    }
-                    else {
-                        let difference = temparr.filter(x => ![ps].includes(x));
-                        if (p.arity = 1) {
-                            arity[0] = difference[0];
-                        } else {
-                            arity[0] = difference[0];
-                            arity[1] = difference[1];
-                        }
-                    }
-                    query = ps + "(" + arity.join(",") + ")";
-                    break;
                 }
             }
+
         }
-        console.log(query);
-        return query;
     }
 
     function Speaking(text) {
         var utterThis = new SpeechSynthesisUtterance(text);
         synth.speak(utterThis);
     }
+    AFRAME.registerComponent('listener', {
+        tick: function () {
+            let current = this.el.getAttribute('position');
+            let cam = new THREE.Vector3( current.x, current.y, current.z );
+            let male = new THREE.Vector3( 32, -0.5, 8 );
 
+            if(male.distanceTo(cam) < 28){
+
+                if(isClose){
+                    Speaking("Hello, I'm Alex, what is your question? Please hit Enter and start asking");
+                    isClose =false;
+                }
+
+            }
+            if(male.distanceTo(cam) > 30){
+              //  Speaking("Goodbye Ngan");
+                isClose =true;
+            }
+        }
+    });
 </script>
+</head>
+<body>
+<a-scene inspector="url: https://aframe.io/releases/0.3.0/aframe-inspector.min.js">
+    <a-assets>
+        <img id="trim" src="images/trim.jpg">
+        <img id="beam" src="images/beam.jpg">
+        <img id="wall" src="images/brick1.jpg">
+        <img id="pillar" src="images/brick3.jpg">
+        <img id="torch" src="images/torch2.jpg">
+        <img id="fire" src="images/fire.png">
+        <img id="mount" src="images/mount.jpg">
+        <img id="ceiling" src="images/ceiling2.jpg">
+        <img id="floor" src="images/floor.jpg">
+        <img id="banner0" src="images/banner0.png">
+        <img id="banner" src="images/banner.png">
+        <img id="screen" src="images/screenProjector.png">
+        <img id="wooden" src="assets/images/wooden.jpg">
+        <img id="glass" src="assets/images/glass.jpg">
+
+
+        <img id="tommy" src="assets/images/tommy.jpg">
+        <img id="ngan" src="assets/images/ngan.jpg">
+        <img id="huyen" src="assets/images/huyen.jpg">
+        <img id="vung" src="assets/images/vung.jpg">
+        <img id="vinh" src="assets/images/vinh.jpg">
+        <img id="nhat" src="assets/images/nhat.jpg">
+
+
+        <a-asset-item id="table" src="assets/models/table/table.dae"></a-asset-item>
+        <a-asset-item id="table" src="assets/models/table/table.glb"></a-asset-item>
+        <a-asset-item id="chair" src="assets/models/Chair/model.dae"></a-asset-item>
+        <a-asset-item id="speaker" src="assets/models/speaker/model.dae"></a-asset-item>
+        <a-asset-item id="couch" src="assets/models/couch/model.dae"></a-asset-item>
+        <a-asset-item id="coffee" src="assets/models/coffee_table/model.dae"></a-asset-item>
+        <a-asset-item id="bedroom" src="assets/models/bedroom/model.dae"></a-asset-item>
+        <a-asset-item id="bed" src="assets/models/bed/model.dae"></a-asset-item>
+        <a-asset-item id="male" src="assets/models/male/model.dae"></a-asset-item>
+    </a-assets>
+    <a-sky color="#ECECEC"></a-sky>
+    <a-entity position="25 1.7 5">
+        <a-camera universal-controls listener>
+            <a-entity raycaster="far: 150; objects: .intersectable" cursor geometry="primitive: ring; radiusOuter: 0.015;
+                              radiusInner: 0.01; segmentsTheta: 32" material="color: #283644; shader: flat"
+                      position="0 0 -0.75"></a-entity>
+        </a-camera>
+    </a-entity>
+
+    <!--Ceiling-->
+    <a-entity static-body geometry="primitive: box; depth: 50; height: 0.1; width: 80" position="0 14 5" material="shader: flat; side: double; opacity: 1;
+src: #ceiling; repeat: 20 12"></a-entity>
+
+    <!--Floor-->
+    <a-entity static-body rotation="-90 0 0" geometry="primitive: plane; height: 50; width: 83" position="0 -0.5 5" material="shader: flat; side: double; opacity: 1;
+src: #floor; repeat: 20 15"></a-entity>
+
+    <!-- Trim -->
+    <a-entity geometry="primitive: box; depth: 0.6; height: 1; width: 80" position="0 13.5 -19.7" rotation="0 0 0"
+              material="shader: standard;
+roughness: 1; src: #trim; repeat: 32 1"></a-entity>
+    <a-entity geometry="primitive: box; depth: 0.6; height: 1; width: 80" position="0 13.5 29.7" rotation="0 0 0"
+              material="shader: standard;
+roughness: 1; src: #trim; repeat: 32 1"></a-entity>
+    <a-entity geometry="primitive: box; depth: 0.6; height: 1; width: 50" position="40 13.5 5" rotation="0 90 0"
+              material="shader: standard;
+roughness: 1; src: #trim; repeat: 9 1"></a-entity>
+    <a-entity geometry="primitive: box; depth: 0.6; height: 1; width: 50" position="-40 13.5 5" rotation="0 90 0"
+              material="shader: standard;
+roughness: 1; src: #trim; repeat: 9 1"></a-entity>
+
+    <!-- H Beams  -->
+    <a-entity id="h1" geometry="primitive: box; depth: 1; height: 1; width: 50" position="0 13.5 5" rotation="0 90 0" material="shader: standard;
+roughness: 1; src: #beam; repeat: 2 1"></a-entity>
+    <a-entity id="h2" geometry="primitive: box; depth: 1; height: 1; width: 50" position="-20 13.5 5" rotation="0 90 0"
+              material="shader: standard;
+roughness: 1; src: #beam; repeat: 2 1"></a-entity>
+    <a-entity id="h3" geometry="primitive: box; depth: 1; height: 1; width: 50" position="14 13.5 5" rotation="0 90 0"
+              material="shader: standard;
+roughness: 1; src: #beam; repeat: 2 1"></a-entity>
+    <a-entity id="h4" geometry="primitive: box; depth: 1; height: 1; width: 50" position="-40 13.5 5" rotation="0 90 0"
+              material="shader: standard;
+roughness: 1; src: #beam; repeat: 2 1"></a-entity>
+    <a-entity id="h5" geometry="primitive: box; depth: 1; height: 1; width: 50" position="40 13.5 5" rotation="0 90 0"
+              material="shader: standard;
+roughness: 1; src: #beam; repeat: 2 1"></a-entity>
+
+
+    <!-- V Beams  -->
+    <a-entity id="v1" static-body geometry="primitive: box; depth: 1; height: 1; width: 13.5" position="0 6.25 -19"
+              rotation="0 0 90" material="shader: standard;
+roughness: 1; src: #beam"></a-entity>
+    <a-entity id="v2" static-body geometry="primitive: box; depth: 1; height: 1; width: 13.5" position="0 6.25 29"
+              rotation="0 0 90" material="shader: standard;
+roughness: 1; src: #beam"></a-entity>
+    <a-entity id="v3" static-body geometry="primitive: box; depth: 1; height: 1; width: 13.5" position="14 6.25 -19"
+              rotation="0 0 90" material="shader: standard;
+roughness: 1; src: #beam"></a-entity>
+    <a-entity id="v4" static-body geometry="primitive: box; depth: 1; height: 1; width: 13.5" position="-20 6.25 29"
+              rotation="0 0 90" material="shader: standard;
+roughness: 1; src: #beam"></a-entity>
+    <a-entity id="v5" static-body geometry="primitive: box; depth: 1; height: 1; width: 13.5" position="40 6.25 -19"
+              rotation="0 0 90" material="shader: standard;
+roughness: 1; src: #beam"></a-entity>
+    <a-entity id="v6" static-body geometry="primitive: box; depth: 1; height: 1; width: 13.5" position="-40 6.25 29"
+              rotation="0 0 90" material="shader: standard;
+roughness: 1; src: #beam"></a-entity>
+
+    <a-entity id="v7" static-body geometry="primitive: box; depth: 1; height: 1; width: 13.5" position="-20 6.25 -19"
+              rotation="0 0 90" material="shader: standard;
+roughness: 1; src: #beam; "></a-entity>
+    <a-entity id="v8" static-body geometry="primitive: box; depth: 1; height: 1; width: 13.5" position="14 6.25 29"
+              rotation="0 0 90" material="shader: standard;
+roughness: 1; src: #beam"></a-entity>
+    <a-entity id="v9" static-body geometry="primitive: box; depth: 1; height: 1; width: 13.5" position="-40 6.25 -19"
+              rotation="0 0 90" material="shader: standard;
+roughness: 1; src: #beam"></a-entity>
+    <a-entity id="v10" static-body geometry="primitive: box; depth: 1; height: 1; width: 13.5" position="40 6.25 29"
+              rotation="0 0 90" material="shader: standard;
+roughness: 1; src: #beam"></a-entity>
+
+    <!--Wall-->
+    <a-entity id="wall1" static-body geometry="primitive: box; depth: 1; height: 13.5; width: 50" position="-41 6.25 5"
+              rotation="0 90 0" material="shader: standard;
+roughness: 1; src: #wall; repeat: 4 2"></a-entity>
+    <a-entity id="wall2" static-body geometry="primitive: box; depth: 1; height: 14; width: 50" position="41 6.5 5"
+              rotation="0 90 0" material="shader: standard;
+roughness: 1; src: #wall; repeat: 4 2"></a-entity>
+    <a-entity id="wall3" static-body geometry="primitive: box; depth: 1; height: 14; width: 80" position="0 6.5 -20"
+              rotation="0 0 0" material="shader: standard;
+roughness: 1; src: #wall; repeat: 12 2"></a-entity>
+    <a-entity id="wall4" static-body geometry="primitive: box; depth: 1; height: 14; width: 80" position="0 6.5 30"
+              rotation="0 0 0" material="shader: standard;
+roughness: 1; src: #wall; repeat: 12 2"></a-entity>
+
+
+    <!--First separation 1-->
+
+    <a-entity id="wall1st" static-body geometry="primitive: box; depth: 0.2; height: 9; width: 50" position="-20 8.5 5"
+              rotation="0 90 0" material="opacity:1; shader: standard;
+transparent:true; src: #wall; repeat: 40 25"></a-entity>
+    <a-entity id="wall1stL" static-body geometry="primitive: box; depth: 0.2; height: 5; width: 20" position="-20 1.5 -10"
+              rotation="0 90 0" material="opacity:0.5; shader: standard;
+transparent:true; src: #glass; repeat: 40 35"></a-entity>
+    <a-entity id="wall1stR" static-body geometry="primitive: box; depth: 0.2; height: 5; width: 20" position="-20 1.5 20"
+              rotation="0 90 0" material="opacity:1; shader: standard;
+transparent:true; src: #glass; repeat: 40 35"></a-entity>
+
+    <a-entity id="wall1stR" static-body geometry="primitive: box; depth: 0.2; height: 10; width: 17" position="-32 1.5 10"
+              rotation="0 0 0" material="opacity:1; shader: standard;
+transparent:true; src: #glass; repeat: 40 35"></a-entity>
+
+
+    <!--2nd separation wall-->
+
+
+
+    <a-entity id="wall2presenttop" static-body geometry="primitive: box; depth: 0.2; height: 9; width: 50" position="14 8.5 5"
+              rotation="0 90 0" material="opacity:1; shader: standard;
+transparent:true; src: #wall; repeat: 40 25"></a-entity>
+    <a-entity id="wall2presenleft" static-body geometry="primitive: box; depth: 0.2; height: 5; width: 20" position="14 1.5 -6"
+              rotation="0 90 0" material="opacity:0.5; shader: standard;
+transparent:true; src: #glass; repeat: 40 35"></a-entity>
+    <a-entity id="wall2presentright" static-body geometry="primitive: box; depth: 0.2; height: 5; width: 19" position="14 1.5 17"
+              rotation="0 90 0" material="opacity:0.5; shader: standard;
+transparent:true; src: #glass; repeat: 40 35"></a-entity>
+    <!--Left screen-->
+
+
+    <a-entity id="leftScreen" geometry="primitive:plane;height:6.5;width:9.8" position="40 7.14 -4.03" rotation="0 -90 0" material="shader:flat;transparent:true;src:#screen" scale="1 1 1" visible="true"></a-entity>
+    <a-entity id="right" geometry="primitive:plane;height:6.5;width:9.8" position="40 7.14 17.03" rotation="0 -90 0" material="shader:flat;transparent:true;src:#screen" scale="1 1 1" visible="true"></a-entity>
+
+    <a-collada-model id="left1" scale="6 2.5 1.5" src="#table" rotation="0 90 0" position="30 -0.7 4.5"></a-collada-model>
+    <a-collada-model id="right1" scale="6 2.5 1.5" src="#table" rotation="0 90 0" position="30 -0.7 20.5"></a-collada-model>
+
+    <a-collada-model id="left2" scale="6 2.5 1.5" src="#table" rotation="0 90 0" position="25 -0.7 4.5"></a-collada-model>
+    <a-collada-model id="right2" scale="6 2.5 1.5" src="#table" rotation="0 90 0" position="25 -0.7 20.5"></a-collada-model>
+
+    <a-collada-model id="left3" scale="6 2.5 1.5" src="#table" rotation="0 90 0" position="20 -0.7 4.5"></a-collada-model>
+    <a-collada-model id="right3" scale="6 2.5 1.5" src="#table" rotation="0 90 0" position="20 -0.7 20.5"></a-collada-model>
+
+    <a-entity position="35 1 7" rotation="0 0 0" scale="1 2.5 1.5" visible="true" geometry="primitive:box" material="shader:flat;transparent:true;src:#wall"></a-entity>
+
+    <!--Speakers-->
+    <a-collada-model id="left1" scale="3 5 3" src="#speaker" rotation="0 -90 0" position="38 -0.45 -14.5"></a-collada-model>
+    <a-collada-model id="right1" scale="3 5 3" src="#speaker" rotation="0 -90 0" position="38 -0.45 24.5"></a-collada-model>
+
+
+
+    <!--Chairs -
+    ->
+    <!--Row1-->
+    <a-collada-model id="left11" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="28 0.2 -5"></a-collada-model>
+    <a-collada-model id="left12" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="28 0.2 -1"></a-collada-model>
+    <a-collada-model id="left13" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="28 0.2 3"></a-collada-model>
+
+    <!--Row1 - Right-->
+    <a-collada-model id="right11" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="28 0.2 11"></a-collada-model>
+    <a-collada-model id="right12" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="28 0.2 15"></a-collada-model>
+    <a-collada-model id="right13" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="28 0.2 19"></a-collada-model>
+
+    <!--Row2 - Left-->
+    <a-collada-model id="left21" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="23 0.2 -5"></a-collada-model>
+    <a-collada-model id="left22" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="23 0.2 -1"></a-collada-model>
+    <a-collada-model id="left23" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="23 0.2 3"></a-collada-model>
+
+
+    <!--Row2 - Right-->
+    <a-collada-model id="right21" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="23 0.2 11"></a-collada-model>
+    <a-collada-model id="right22" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="23 0.2 15"></a-collada-model>
+    <a-collada-model id="right23" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="23 0.2 19"></a-collada-model>
+
+
+
+    <!--Row3 - Left-->
+    <a-collada-model id="left21" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="18 0.2 -5"></a-collada-model>
+    <a-collada-model id="left22" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="18 0.2 -1"></a-collada-model>
+    <a-collada-model id="left23" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="18 0.2 3"></a-collada-model>
+
+
+    <!--Row3 - Right-->
+    <a-collada-model id="right21" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="18 0.2 11"></a-collada-model>
+    <a-collada-model id="right22" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="18 0.2 15"></a-collada-model>
+    <a-collada-model id="right23" scale="2 2.5 2" src="#chair" rotation="0 90 0" position="18 0.2 19"></a-collada-model>
+
+
+
+    <a-entity geometry="primitive: plane; height: 5; width: 4" position="7.5 7.5 28.98" rotation="0 180 0"
+              material="shader: flat; transparent: true; src: #tommy">
+    </a-entity>
+
+    <a-entity geometry="primitive: plane; height: 5; width: 4" position="-5 7.5 28.98" rotation="0 180 0"
+              material="shader: flat; transparent: true; src: #ngan">
+    </a-entity>
+
+    <a-entity geometry="primitive: plane; height: 5; width: 4" position="-10 7.5 28.98" rotation="0 180 0"
+              material="shader: flat; transparent: true; src: #huyen">
+    </a-entity>
+
+    <a-entity geometry="primitive: plane; height: 5; width: 4" position="-15 7.5 28.98" rotation="0 180 0"
+              material="shader: flat; transparent: true; src: #vung">
+    </a-entity>
+
+    <a-entity geometry="primitive: plane; height: 5; width: 4" position="-30 7.5 28.98" rotation="0 180 0"
+              material="shader: flat; transparent: true; src: #vinh">
+    </a-entity>
+
+
+    <!--Couch and Coffee table-->
+    <a-collada-model id="couch" scale="3 3 3" src="#couch" rotation="0 90 0" position="6.5 -0.5 20"></a-collada-model>
+    <a-collada-model id="coffee" scale="3.5 3 3" src="#coffee" rotation="0 90 0" position="2.5 -0.5 19.5"></a-collada-model>
+
+    <a-collada-model id="male" scale="0.8 0.8 0.8" src="#male" rotation="0 -90 0" position="32 -0.5 16"></a-collada-model>
+
+
+
+    <!--Bed room-->
+    <!--<a-collada-model id="bedroom" scale="0.7 0.7 0.7" src="#bedroom" rotation="0 180 0" position="-22 -0.5 20.5"></a-collada-model>-->
+    <!--<a-collada-model id="bed" scale="0.025 0.025 0.035" src="#bed" rotation="0 180 0" position="-36 -0.5 27.5"></a-collada-model>-->
+
+
+
+    <!--Banner-->
+
+    <!-- Banners -->
+    <a-entity geometry="primitive: plane; height: 7; width: 1.5" position="0 7.5 26" rotation="0 90 0" material="shader: flat; side: double; transparent: true;
+src: #banner">
+        <a-entity geometry="primitive: cylinder; radius: 0.1; height: 4" position="-0.9 3.5 0" rotation="0 0 90"
+                  material="
+src: #torch"></a-entity>
+    </a-entity>
+
+    <!-- Welcome -->
+    <a-entity geometry="primitive: plane; height: 6.9; width: 10" position="0 9.2 -1" rotation="0 0 0" material="shader: flat; side: double; transparent: true;
+src: url(images/welcome.png)">
+        <a-entity geometry="primitive: plane; height: 6.9; width: 10" position="0 0 -0.01" rotation="0 180 0" material="shader: flat; side: double; transparent: true;
+src: url(images/welcome-back.png)"></a-entity>
+        <a-entity geometry="primitive: cylinder; radius: 0.2; height: 11" position="0 3.5 0" rotation="90 90 0"
+                  material="
+src: #torch"></a-entity>
+    </a-entity>
+</a-scene>
+
 </body>
+<!--<script>-->
+    <!--const stopwords = ["of", "the", "a", "an", "any", "is", "can", "who", "what", "why"];-->
+    <!--const editor = "sorts\n" +-->
+        <!--"    #people = {tommy, alex, john, daniel, sarah, peter, lino}.\n" +-->
+        <!--"    #gender = {male, female}.\n" +-->
+        <!--"    #abc = {msale,sds,sdsds, female}.\n" +-->
+        <!--"predicates\n" +-->
+        <!--"    advisor(#people, #people).\n" +-->
+        <!--"    friend(#people, #people).\n" +-->
+        <!--"    gender(#people,#gender).\n" +-->
+        <!--"    spanish(#people).\n" +-->
+        <!--"rules\n" +-->
+        <!--"    advisor(tommy, alex).\n" +-->
+        <!--"    advisor(tommy, john).\n" +-->
+        <!--"    advisor(tommy, daniel).\n" +-->
+        <!--"    advisor(tommy, lino).\n" +-->
+        <!--"    friend(lino, alex).\n" +-->
+        <!--"    friend(lino, peter).\n" +-->
+        <!--"    friend(sarah, alex).\n" +-->
+        <!--"    gender(tommy,male).\n" +-->
+        <!--"    gender(lino,male).\n" +-->
+        <!--"    gender(sarah, female).\n" +-->
+        <!--"    spanish(lino).";-->
+    <!--// sorts-->
+    <!--var contstring = editor.split("sorts\n")[1].split("predicates\n");-->
+    <!--var sortstring = contstring[0].split('.');-->
+    <!--sortstring.splice(-1, 1);-->
+    <!--var sorts = {};-->
+    <!--sortstring = sortstring.map(d => d.replace(/\n/g, '').trim()).forEach(d => {-->
+        <!--var par = d.split("=");-->
+        <!--sorts[par[0].replace(/#/, '').trim()] = par[1].replace(/{|}/g, '').split(',').map(w => w.trim())-->
+    <!--});-->
+    <!--// predicates-->
+    <!--var predicates = {};-->
+    <!--contstring = contstring[1].split("rules\n");-->
+    <!--sortstring = contstring[0].split('.');-->
+    <!--sortstring.splice(-1, 1);-->
+    <!--sortstring.forEach(d => {-->
+        <!--var part = d.replace(/\n/g, '').trim().split('(');-->
+        <!--var func = part[0];-->
+        <!--predicates[func] = {};-->
+        <!--var par = part[1].split(',').map(e => e.replace(/#|\)/g, '').trim());-->
+        <!--var par1 = sorts[par[0]].slice();-->
+        <!--par1.push("X");-->
+        <!--par.splice(-1, 1);-->
+        <!--par1.forEach(e => {-->
+            <!--var strinh = (e == 'X' ? '' : (e + ' ')) + func;-->
+            <!--predicates[func][strinh] = func + "(" + e + ")";-->
+            <!--par.forEach(par2 => {-->
+                <!--var temp = sorts[par2].slice();-->
+                <!--temp.push("X");-->
+                <!--temp.forEach(t => {-->
+                    <!--var strinh = (e == 'X' ? '' : (e + ' ')) + func + (t == 'X' ? '' : (' ' + t));-->
+                    <!--// if (strinh != func)-->
+                    <!--predicates[func][strinh] = func + "(" + e + "," + t + ")";-->
+                <!--})-->
+            <!--});-->
+        <!--});-->
+    <!--});-->
+
+
+    <!--var all_predicates = [];-->
+    <!--for (var key1 in predicates) {-->
+        <!--if (predicates.hasOwnProperty(key1)) {-->
+            <!--for (var key2 in predicates[key1]) {-->
+                <!--if (predicates[key1].hasOwnProperty(key2))-->
+                    <!--all_predicates.push(key2);-->
+            <!--}-->
+        <!--}-->
+
+    <!--}-->
+
+    <!--a = FuzzySet(all_predicates);-->
+
+    <!--var synth = window.speechSynthesis;-->
+    <!--var SpeechRecognition = SpeechRecognition || webkitSpeechRecognition;-->
+    <!--var recognition = new SpeechRecognition();-->
+    <!--recognition.lang = 'en-US';-->
+    <!--recognition.interimResults = false;-->
+    <!--recognition.maxAlternatives = 1;-->
+
+
+    <!--$(document).keypress(function (e) {-->
+        <!--if (e.which == 13) {-->
+            <!--ListeningMode();-->
+        <!--}-->
+    <!--});-->
+
+    <!--function ListeningMode() {-->
+        <!--recognition.start();-->
+    <!--}-->
+
+    <!--recognition.onresult = function (event) {-->
+        <!--// The SpeechRecognitionEvent results property returns a SpeechRecognitionResultList object-->
+        <!--// The SpeechRecognitionResultList object contains SpeechRecognitionResult objects.-->
+        <!--// It has a getter so it can be accessed like an array-->
+        <!--// The [last] returns the SpeechRecognitionResult at the last position.-->
+        <!--// Each SpeechRecognitionResult object contains SpeechRecognitionAlternative objects that contain individual results.-->
+        <!--// These also have getters so they can be accessed like arrays.-->
+        <!--// The [0] returns the SpeechRecognitionAlternative at position 0.-->
+        <!--// We then return the transcript property of the SpeechRecognitionAlternative object-->
+
+        <!--var last = event.results.length - 1;-->
+        <!--var transcript = event.results[last][0].transcript;-->
+
+
+        <!--var trim_script = transcript.split(" ");-->
+        <!--trim_script = trim_script.filter(f => !stopwords.includes(f));-->
+
+        <!--var result = a.get(trim_script.join(" "), null, 0.5);-->
+
+
+        <!--for (var key1 in predicates) {-->
+            <!--if (predicates.hasOwnProperty(key1)) {-->
+                <!--for (var key2 in predicates[key1]) {-->
+                    <!--if (predicates[key1].hasOwnProperty(key2))-->
+                        <!--if (result[0][1] == key2) {-->
+                            <!--console.log(predicates[key1][key2]);-->
+
+                            <!--var utterThis = new SpeechSynthesisUtterance(key2);-->
+                            <!--synth.speak(utterThis);-->
+
+                            <!--var data = {-->
+                                <!--'action': "getQuery",-->
+                                <!--'query': predicates[key1][key2],-->
+                                <!--'editor': editor-->
+                            <!--};-->
+
+                            <!--// Expected response : answer sets-->
+                            <!--$.post("http://wave.ttu.edu/ajax.php", data, function (response) {-->
+                                <!--var pre_string = "The answer to your question " + transcript + " is ";-->
+                                <!--console.log(response);-->
+                                <!--var html = document.createElement("html");-->
+                                <!--html.innerHTML = response;-->
+                                <!--Speaking(pre_string + html.querySelector("p").textContent.replace(/X =/gm, ""));-->
+
+                            <!--});-->
+                        <!--}-->
+                <!--}-->
+            <!--}-->
+
+        <!--}-->
+    <!--}-->
+
+    <!--function Speaking(text) {-->
+        <!--var utterThis = new SpeechSynthesisUtterance(text);-->
+        <!--synth.speak(utterThis);-->
+    <!--}-->
+<!--</script>-->
 </html>
