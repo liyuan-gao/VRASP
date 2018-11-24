@@ -9,12 +9,29 @@
     <script src="libs/fuzzyset.js"></script>
 
 <script>
+    // random content
+
+
+    const contentRan = {
+        greeting: ['Hello','Hi','How do you do?','How are you?','May I help you?','Do you have an question?'],
+        introduction: ['I am Alex','Alex here','My name is Alex','You can call me Alex'],
+        tutorial: ['Hit enter to ask a question','Please say your command after hit Enter','Please Enter before speak'],
+        goodbye: ['If you have any question, you can return and ask me','See you later','I am waitting here'],
+        answer: {
+            unknown: ["I don't know","No one knows","Hard to answer that question"],
+            yes: ["Correct","That's right","As I know, yes","Somebody said so"],
+            no: ["Incorrect","Is is wrong","No no no"]
+        },
+        waitingchat: ['This room is beautiful, right?'],
+        unknowncommand: ['What did you say?','Humm','Can you repeat again?','Pardon me'],
+        itteraction: ['Ouch'],
+    };
+    //
     var isClose=true;
     const stopwords = ["of", "the", "a", "an", "any", "is", "can", "who", "what", "why"];
     const editor = "sorts\n" +
         "    #people = {tommy, alex, john, daniel, sarah, peter, lino}.\n" +
         "    #gender = {male, female}.\n" +
-        "    #abc = {msale,sds,sdsds, female}.\n" +
         "predicates\n" +
         "    advisor(#people, #people).\n" +
         "    friend(#people, #people).\n" +
@@ -53,7 +70,7 @@
         var par = part[1].split(',').map(e => e.replace(/#|\)/g, '').trim());
         var par1 = sorts[par[0]].slice();
         par1.push("X");
-        par.splice(-1, 1);
+        par.splice(0, 1);
         par1.forEach(e => {
             var strinh = (e == 'X' ? '' : (e + ' ')) + func;
             predicates[func][strinh] = func + "(" + e + ")";
@@ -62,7 +79,7 @@
                 temp.push("X");
                 temp.forEach(t => {
                     var strinh = (e == 'X' ? '' : (e + ' ')) + func + (t == 'X' ? '' : (' ' + t));
-                    // if (strinh != func)
+                    // if (strinh != fubnc)
                     predicates[func][strinh] = func + "(" + e + "," + t + ")";
                 })
             });
@@ -90,10 +107,10 @@
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
-
+    let dis = 1000;
     $(document).keypress(function (e) {
         if (e.which == 13) {
-            ListeningMode();
+            currentState = currentState(dis,30,true);
         }
     });
 
@@ -113,70 +130,97 @@
 
         var last = event.results.length - 1;
         var transcript = event.results[last][0].transcript;
-
+        console.log(transcript);
 
         var trim_script = transcript.split(" ");
         trim_script = trim_script.filter(f => !stopwords.includes(f));
-
+        console.log(trim_script);
         var result = a.get(trim_script.join(" "), null, 0.5);
+        console.log(result);
 
+        if (result!=null) {
+            var mainkey = result[0][1];
+            var answerarr = mainkey.split(' ');
+            var key1 = '';
+            answerarr.forEach(d => {
+                key1 = (predicates[d] != undefined) ? d : key1;
+            });
+            //var key1 = answerarr.length>2? answerarr[1]:answerarr[0];
+            var key2 = result[0][1];
+            console.log(predicates[key1][key2]);
+            var utterThis = new SpeechSynthesisUtterance(key2);
+            synth.speak(utterThis);
 
-        for (var key1 in predicates) {
-            if (predicates.hasOwnProperty(key1)) {
-                for (var key2 in predicates[key1]) {
-                    if (predicates[key1].hasOwnProperty(key2))
-                        if (result[0][1] == key2) {
-                            console.log(predicates[key1][key2]);
+            var data = {
+                'action': "getQuery",
+                'query': predicates[key1][key2],
+                'editor': editor
+            };
 
-                            var utterThis = new SpeechSynthesisUtterance(key2);
-                            synth.speak(utterThis);
-
-                            var data = {
-                                'action': "getQuery",
-                                'query': predicates[key1][key2],
-                                'editor': editor
-                            };
-
-                            // Expected response : answer sets
-                            $.post("http://wave.ttu.edu/ajax.php", data, function (response) {
-                                var pre_string = "The answer to your question " + transcript + " is ";
-                                console.log(response);
-                                var html = document.createElement("html");
-                                html.innerHTML = response;
-                                Speaking(pre_string + html.querySelector("p").textContent.replace(/X =/gm, ""));
-
-                            });
-                        }
-                }
-            }
-
+            // Expected response : answer sets
+            $.post("http://wave.ttu.edu/ajax.php", data, function (response) {
+                console.log(response);
+                var html = document.createElement("html");
+                html.innerHTML = response;
+                // contentRan
+                var answerstring = html.querySelector("p").textContent.replace(/X =/gm, "");
+                var answerarr = answerstring.split("\n");
+                answerarr.splice(-1,1);
+                console.log(answerarr);
+                var pre_string = "The answer to your question " + transcript + " is ";
+                answerstring = contentRan.answer[answerarr[0].toLowerCase().trim()]==undefined?
+                    (pre_string + (answerarr.length==1?answerstring:(answerarr.splice(-1, 0, "and"),answerarr.join())))
+                    : generaspeak(contentRan.answer[answerarr[0].toLowerCase().trim()]);
+                console.log(answerstring);
+                Speaking(answerstring);
+            });
+        }else{
+            Speaking(generaspeak(contentRan.unknowncommand));
         }
+        currentState = currentState(true);
+        //console.log(currentState);
     }
 
     function Speaking(text) {
         var utterThis = new SpeechSynthesisUtterance(text);
         synth.speak(utterThis);
     }
+    const States = {
+        idle: (dis,mindis)=>dis<mindis?(near(),States.ready):States.idle,
+        ready: (dis,maxdis,button)=>{
+            if (dis>maxdis){
+              return States.out();
+            }else{
+                if (button) {
+                    ListeningMode();
+                    return States.query;
+                }else
+                    return States.ready;
+            }},
+        query: (done)=>done===true?States.ready:States.query,
+        out: ()=>{
+            Speaking(generaspeak(contentRan.goodbye));
+            return States.idle()}
+    };
+
+    let currentState = States.idle;
     AFRAME.registerComponent('listener', {
         tick: function () {
             let current = this.el.getAttribute('position');
             let cam = new THREE.Vector3( current.x, current.y, current.z );
             let male = new THREE.Vector3( 32, -0.5, 8 );
-
-            if(male.distanceTo(cam) < 28){
-
-                if(isClose){
-                    Speaking("Hello, I'm Alex, what is your question? Please hit Enter and start asking");
-                    isClose =false;
-                }
-
-            }
-            if(male.distanceTo(cam) > 30){
-              //  Speaking("Goodbye Ngan");
-                isClose =true;
-            }
+            dis = male.distanceTo(cam);
+            currentState = currentState(dis,28);
+            //currentState = States.idle(male.distanceTo(cam),30);
         }
     });
+    function generaspeak(speakarr){
+        return speakarr[Math.round(Math.random()*(speakarr.length-1))]+' ';
+    }
+    function near(){
+        var sentence = generaspeak(contentRan.greeting)+generaspeak(contentRan.introduction)+generaspeak(contentRan.tutorial);
+        Speaking(sentence);
+    }
 </script>
 </head>
 <body>
