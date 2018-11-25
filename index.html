@@ -7,7 +7,9 @@
     <script src="libs/jquery-3.3.1.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.5.1/dist/aframe-look-at-component.min.js"></script>
     <script src="libs/fuzzyset.js"></script>
-
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/4.4.0/bootbox.min.js"></script>
 <script>
     // random content
 
@@ -29,7 +31,7 @@
     //
     var isClose=true;
     const stopwords = ["of", "the", "a", "an", "any", "is", "can", "who", "what", "why"];
-    const editor = "sorts\n" +
+    var editor = "sorts\n" +
         "    #people = {tommy, alex, john, daniel, sarah, peter, lino}.\n" +
         "    #gender = {male, female}.\n" +
         "predicates\n" +
@@ -108,10 +110,25 @@
     recognition.maxAlternatives = 1;
 
     let dis = 1000;
+    let editstate = false;
     $(document).keypress(function (e) {
         if (e.which == 13) {
             currentState = currentState(dis,30,true);
         }
+        console.log(e.which)
+        if (e.which == 116&&!editstate) {
+            editstate = true;
+            bootbox.prompt({
+                title: "Answer Set Programming Code",
+                inputType: 'textarea',
+                value:editor,
+                callback: function (result) {
+                    editor = result;
+                    editstate = false;
+                }
+            });
+        }
+
     });
 
     function ListeningMode() {
@@ -222,6 +239,11 @@
         Speaking(sentence);
     }
 </script>
+    <style>
+        textarea{
+            min-height: 500px;
+        }
+    </style>
 </head>
 <body>
 <a-scene inspector="url: https://aframe.io/releases/0.3.0/aframe-inspector.min.js">
