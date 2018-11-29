@@ -20,17 +20,17 @@
         tutorial: ['Hit enter to ask a question','Please say your command after hit Enter','Please Enter before speak'],
         goodbye: ['If you have any question, you can return and ask me','See you later','I am waitting here'],
         answer: {
-            unknown: ["I don't know","No one knows","Hard to answer that question"],
+            unknown: ["I don't know","No one knows","Hard to answer that question","To the best of my knowledge I don't know, please correct me","Actually, I don't know"],
             yes: ["Correct","That's right","As I know, yes","Somebody said so"],
-            no: ["Incorrect","Is is wrong","No no no"]
+            no: ["Incorrect","Nope, I don't think so","No, uh oh uh oh","It is wrong","No no no"]
         },
         waitingchat: ['This room is beautiful, right?'],
-        unknowncommand: ['What did you say?','Humm','Can you repeat again?','Pardon me'],
+        unknowncommand: ['What did you say?','I am sorry. what?','Can you repeat again?','Pardon me'],
         itteraction: ['Ouch'],
     };
     //
     var isClose=true;
-    const stopwords = ["of", "the", "a", "an", "any", "is", "can", "who", "what", "why"];
+    const stopwords = ["of", "the", "a", "an", "any", "is", "can", "who", "what", "why", "whom"];
     var editor = "sorts\n" +
         "    #people = {tommy, alex, john, daniel, sarah, peter, lino}.\n" +
         "    #gender = {male, female}.\n" +
@@ -47,6 +47,7 @@
         "    friend(lino, alex).\n" +
         "    friend(lino, peter).\n" +
         "    friend(sarah, alex).\n" +
+        "    friend(X, Y):-friend(Y,X).\n" +
         "    gender(tommy,male).\n" +
         "    gender(lino,male).\n" +
         "    gender(sarah, female).\n" +
@@ -99,7 +100,7 @@
         }
 
     }
-
+    all_predicates.push('speak spanish'); // extra terms
     a = FuzzySet(all_predicates);
 
     var synth = window.speechSynthesis;
@@ -112,7 +113,7 @@
     let dis = 1000;
     let editstate = false;
     $(document).keypress(function (e) {
-        if (e.which == 13) {
+        if (e.which == 13&&!editstate) {
             currentState = currentState(dis,30,true);
         }
         console.log(e.which)
@@ -123,7 +124,7 @@
                 inputType: 'textarea',
                 value:editor,
                 callback: function (result) {
-                    editor = result;
+                    editor = result||editor;
                     editstate = false;
                 }
             });
@@ -133,6 +134,11 @@
 
     function ListeningMode() {
         recognition.start();
+    }
+
+    recognition.onend = function (){
+        recognition.stop();
+        currentState = currentState(true);
     }
 
     recognition.onresult = function (event) {
@@ -147,8 +153,11 @@
 
         var last = event.results.length - 1;
         var transcript = event.results[last][0].transcript;
-        console.log(transcript);
-
+        // console.log(transcript1);
+        // var transcript = transcript1;
+        // if (transcript1.match('of')!==null)
+        //     transcript = transcript1.split(' ').reverse().join(' ');
+        // console.log(transcript);
         var trim_script = transcript.split(" ");
         trim_script = trim_script.filter(f => !stopwords.includes(f));
         console.log(trim_script);
@@ -156,14 +165,15 @@
         console.log(result);
 
         if (result!=null) {
-            var mainkey = result[0][1];
+            var mainkey = result[0][1].replace('speak ','');
             var answerarr = mainkey.split(' ');
             var key1 = '';
             answerarr.forEach(d => {
                 key1 = (predicates[d] != undefined) ? d : key1;
             });
             //var key1 = answerarr.length>2? answerarr[1]:answerarr[0];
-            var key2 = result[0][1];
+            var key2 = mainkey;
+            console.log(key1 +'-'+ key2);
             console.log(predicates[key1][key2]);
             var utterThis = new SpeechSynthesisUtterance(key2);
             synth.speak(utterThis);
