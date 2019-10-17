@@ -16,4 +16,5 @@ Disable CORS in Chrome, in order to enable request to SPARC (wave.ttu.edu) site:
 
 If you need access to local files for dev purposes like AJAX or JSON, you can use -–allow-file-access-from-files flag.
 
+---
 *source: https://alfilatov.com/posts/run-chrome-without-cors/*
