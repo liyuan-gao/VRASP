@@ -2,260 +2,342 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>VRASP: A Virtual Reality Environment for Learning Answer Set Programming</title>
     <script src="https://aframe.io/releases/0.8.0/aframe.min.js"></script>
-    <script src="libs/jquery-3.3.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.5.1/dist/aframe-look-at-component.min.js"></script>
     <script src="libs/fuzzyset.js"></script>
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.9.0/css/all.css">
+
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/4.4.0/bootbox.min.js"></script>
-<script>
-    // random content
 
+    <script>
+        // random content
 
-    const contentRan = {
-        greeting: ['Hello','Hi','How do you do?','How are you?','May I help you?','Do you have an question?'],
-        introduction: ['I am Alex','Alex here','My name is Alex','You can call me Alex'],
-        tutorial: ['Hit enter to ask a question','Please say your command after hit Enter','Please Enter before speak'],
-        goodbye: ['If you have any question, you can return and ask me','See you later','I am waitting here'],
-        answer: {
-            unknown: ["I don't know","No one knows","Hard to answer that question","To the best of my knowledge I don't know, please correct me","Actually, I don't know"],
-            yes: ["Correct","That's right","As I know, yes","Somebody said so"],
-            no: ["Incorrect","Nope, I don't think so","No, uh oh uh oh","It is wrong","No no no"]
-        },
-        waitingchat: ['This room is beautiful, right?'],
-        unknowncommand: ['What did you say?','I am sorry. what?','Can you repeat again?','Pardon me'],
-        itteraction: ['Ouch'],
-    };
-    //
-    var isClose=true;
-    const stopwords = ["of", "the", "a", "an", "any", "is", "can", "who", "what", "why", "whom"];
-    var editor = "sorts\n" +
-        "    #people = {tommy, alex, john, daniel, sarah, peter, lino}.\n" +
-        "    #gender = {male, female}.\n" +
-        "predicates\n" +
-        "    advisor(#people, #people).\n" +
-        "    friend(#people, #people).\n" +
-        "    gender(#people,#gender).\n" +
-        "    spanish(#people).\n" +
-        "rules\n" +
-        "    advisor(tommy, alex).\n" +
-        "    advisor(tommy, john).\n" +
-        "    advisor(tommy, daniel).\n" +
-        "    advisor(tommy, lino).\n" +
-        "    friend(lino, alex).\n" +
-        "    friend(lino, peter).\n" +
-        "    friend(sarah, alex).\n" +
-        "    friend(X, Y):-friend(Y,X).\n" +
-        "    gender(tommy,male).\n" +
-        "    gender(lino,male).\n" +
-        "    gender(sarah, female).\n" +
-        "    spanish(lino).";
-    // sorts
-    var contstring = editor.split("sorts\n")[1].split("predicates\n");
-    var sortstring = contstring[0].split('.');
-    sortstring.splice(-1, 1);
-    var sorts = {};
-    sortstring = sortstring.map(d => d.replace(/\n/g, '').trim()).forEach(d => {
-        var par = d.split("=");
-        sorts[par[0].replace(/#/, '').trim()] = par[1].replace(/{|}/g, '').split(',').map(w => w.trim())
-    });
-    // predicates
-    var predicates = {};
-    contstring = contstring[1].split("rules\n");
-    sortstring = contstring[0].split('.');
-    sortstring.splice(-1, 1);
-    sortstring.forEach(d => {
-        var part = d.replace(/\n/g, '').trim().split('(');
-        var func = part[0];
-        predicates[func] = {};
-        var par = part[1].split(',').map(e => e.replace(/#|\)/g, '').trim());
-        var par1 = sorts[par[0]].slice();
-        par1.push("X");
-        par.splice(0, 1);
-        par1.forEach(e => {
-            var strinh = (e == 'X' ? '' : (e + ' ')) + func;
-            predicates[func][strinh] = func + "(" + e + ")";
-            par.forEach(par2 => {
-                var temp = sorts[par2].slice();
-                temp.push("X");
-                temp.forEach(t => {
-                    var strinh = (e == 'X' ? '' : (e + ' ')) + func + (t == 'X' ? '' : (' ' + t));
-                    // if (strinh != fubnc)
-                    predicates[func][strinh] = func + "(" + e + "," + t + ")";
-                })
-            });
-        });
-    });
-
-
-    var all_predicates = [];
-    for (var key1 in predicates) {
-        if (predicates.hasOwnProperty(key1)) {
-            for (var key2 in predicates[key1]) {
-                if (predicates[key1].hasOwnProperty(key2))
-                    all_predicates.push(key2);
-            }
-        }
-
-    }
-    all_predicates.push('speak spanish'); // extra terms
-    a = FuzzySet(all_predicates);
-
-    var synth = window.speechSynthesis;
-    var SpeechRecognition = SpeechRecognition || webkitSpeechRecognition;
-    var recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    let dis = 1000;
-    let editstate = false;
-    $(document).keypress(function (e) {
-        if (e.which == 13&&!editstate) {
-            currentState = currentState(dis,30,true);
-        }
-        console.log(e.which)
-        if (e.which == 116&&!editstate) {
-            editstate = true;
-            bootbox.prompt({
-                title: "Answer Set Programming Code",
-                inputType: 'textarea',
-                value:editor,
-                callback: function (result) {
-                    editor = result||editor;
-                    editstate = false;
+        $( function() {
+            $( "#dialog-message" ).dialog({
+                autoOpen: false,
+                maxWidth:600,
+                maxHeight: 800,
+                width: 500,
+                height: 650,
+                buttons: {
+                    Save: function() {
+                        $( this ).dialog( "close" );
+                    },
+                    Cancel: function() {
+                        $( this ).dialog( "close" );
+                    }
+                },
+                show: {
+                    effect: "blind",
+                    duration: 1000
+                },
+                hide: {
+                    effect: "explode",
+                    duration: 1000
                 }
             });
+
+            $( "#edit" ).on( "click", function() {
+                $( "#dialog-message" ).dialog( "open" );
+            });
+
+            $('#design').on("click",function () {
+                window.postMessage('INJECT_AFRAME_INSPECTOR','*');
+            })
+        } );
+        const contentRan = {
+            greeting: ['Hello','Hi','How do you do?','How are you?','May I help you?','Do you have an question?'],
+            introduction: ['I am Alex','Alex here','My name is Alex','You can call me Alex'],
+            tutorial: ['Hit enter to ask a question','Please say your command after hit Enter','Please Enter before speak'],
+            goodbye: ['If you have any question, you can return and ask me','See you later','I am waitting here'],
+            answer: {
+                unknown: ["I don't know","No one knows","Hard to answer that question","To the best of my knowledge I don't know, please correct me","Actually, I don't know"],
+                yes: ["Correct","That's right","As I know, yes","Somebody said so"],
+                no: ["Incorrect","Nope, I don't think so","No, uh oh uh oh","It is wrong","No no no"]
+            },
+            waitingchat: ['This room is beautiful, right?'],
+            unknowncommand: ['What did you say?','I am sorry. what?','Can you repeat again?','Pardon me'],
+            itteraction: ['Ouch'],
+        };
+        //
+        var isClose=true;
+        const stopwords = ["of", "the", "a", "an", "any", "is", "can", "who", "what", "why", "whom"];
+        var editor = "sorts\n" +
+            "    #people = {tommy, alex, john, daniel, sarah, peter, lino}.\n" +
+            "    #gender = {male, female}.\n" +
+            "predicates\n" +
+            "    advisor(#people, #people).\n" +
+            "    friend(#people, #people).\n" +
+            "    gender(#people,#gender).\n" +
+            "    spanish(#people).\n" +
+            "rules\n" +
+            "    advisor(tommy, alex).\n" +
+            "    advisor(tommy, john).\n" +
+            "    advisor(tommy, daniel).\n" +
+            "    advisor(tommy, lino).\n" +
+            "    friend(lino, alex).\n" +
+            "    friend(lino, peter).\n" +
+            "    friend(sarah, alex).\n" +
+            "    friend(X, Y):-friend(Y,X).\n" +
+            "    gender(tommy,male).\n" +
+            "    gender(lino,male).\n" +
+            "    gender(sarah, female).\n" +
+            "    spanish(lino).";
+        // sorts
+        var contstring = editor.split("sorts\n")[1].split("predicates\n");
+        var sortstring = contstring[0].split('.');
+        sortstring.splice(-1, 1);
+        var sorts = {};
+        sortstring = sortstring.map(d => d.replace(/\n/g, '').trim()).forEach(d => {
+            var par = d.split("=");
+            sorts[par[0].replace(/#/, '').trim()] = par[1].replace(/{|}/g, '').split(',').map(w => w.trim())
+        });
+        // predicates
+        var predicates = {};
+        contstring = contstring[1].split("rules\n");
+        sortstring = contstring[0].split('.');
+        sortstring.splice(-1, 1);
+        sortstring.forEach(d => {
+            var part = d.replace(/\n/g, '').trim().split('(');
+            var func = part[0];
+            predicates[func] = {};
+            var par = part[1].split(',').map(e => e.replace(/#|\)/g, '').trim());
+            var par1 = sorts[par[0]].slice();
+            par1.push("X");
+            par.splice(0, 1);
+            par1.forEach(e => {
+                var strinh = (e == 'X' ? '' : (e + ' ')) + func;
+                predicates[func][strinh] = func + "(" + e + ")";
+                par.forEach(par2 => {
+                    var temp = sorts[par2].slice();
+                    temp.push("X");
+                    temp.forEach(t => {
+                        var strinh = (e == 'X' ? '' : (e + ' ')) + func + (t == 'X' ? '' : (' ' + t));
+                        // if (strinh != fubnc)
+                        predicates[func][strinh] = func + "(" + e + "," + t + ")";
+                    })
+                });
+            });
+        });
+
+
+        var all_predicates = [];
+        for (var key1 in predicates) {
+            if (predicates.hasOwnProperty(key1)) {
+                for (var key2 in predicates[key1]) {
+                    if (predicates[key1].hasOwnProperty(key2))
+                        all_predicates.push(key2);
+                }
+            }
+
+        }
+        all_predicates.push('speak spanish'); // extra terms
+        a = FuzzySet(all_predicates);
+
+        var synth = window.speechSynthesis;
+        var SpeechRecognition = SpeechRecognition || webkitSpeechRecognition;
+        var recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        let dis = 1000;
+        let editstate = false;
+        $(document).keypress(function (e) {
+            if (e.which == 13&&!editstate) {
+                currentState = currentState(dis,30,true);
+            }
+            console.log(e.which)
+            if (e.which == 116&&!editstate) {
+                editstate = true;
+                bootbox.prompt({
+                    title: "Answer Set Programming Code",
+                    inputType: 'textarea',
+                    value:editor,
+                    callback: function (result) {
+                        editor = result||editor;
+                        editstate = false;
+                    }
+                });
+            }
+
+        });
+
+        function ListeningMode() {
+            recognition.start();
         }
 
-    });
-
-    function ListeningMode() {
-        recognition.start();
-    }
-
-    recognition.onend = function (){
-        recognition.stop();
-        currentState = currentState(true);
-    }
-
-    recognition.onresult = function (event) {
-        // The SpeechRecognitionEvent results property returns a SpeechRecognitionResultList object
-        // The SpeechRecognitionResultList object contains SpeechRecognitionResult objects.
-        // It has a getter so it can be accessed like an array
-        // The [last] returns the SpeechRecognitionResult at the last position.
-        // Each SpeechRecognitionResult object contains SpeechRecognitionAlternative objects that contain individual results.
-        // These also have getters so they can be accessed like arrays.
-        // The [0] returns the SpeechRecognitionAlternative at position 0.
-        // We then return the transcript property of the SpeechRecognitionAlternative object
-
-        var last = event.results.length - 1;
-        var transcript = event.results[last][0].transcript;
-        // console.log(transcript1);
-        // var transcript = transcript1;
-        // if (transcript1.match('of')!==null)
-        //     transcript = transcript1.split(' ').reverse().join(' ');
-        // console.log(transcript);
-        var trim_script = transcript.split(" ");
-        trim_script = trim_script.filter(f => !stopwords.includes(f));
-        console.log(trim_script);
-        var result = a.get(trim_script.join(" "), null, 0.5);
-        console.log(result);
-
-        if (result!=null) {
-            var mainkey = result[0][1].replace('speak ','');
-            var answerarr = mainkey.split(' ');
-            var key1 = '';
-            answerarr.forEach(d => {
-                key1 = (predicates[d] != undefined) ? d : key1;
-            });
-            //var key1 = answerarr.length>2? answerarr[1]:answerarr[0];
-            var key2 = mainkey;
-            console.log(key1 +'-'+ key2);
-            console.log(predicates[key1][key2]);
-            var utterThis = new SpeechSynthesisUtterance(key2);
-            synth.speak(utterThis);
-
-            var data = {
-                'action': "getQuery",
-                'query': predicates[key1][key2],
-                'editor': editor
-            };
-
-            // Expected response : answer sets
-            $.post("http://wave.ttu.edu/ajax.php", data, function (response) {
-                console.log(response);
-                var html = document.createElement("html");
-                html.innerHTML = response;
-                // contentRan
-                var answerstring = html.querySelector("p").textContent.replace(/X =/gm, "");
-                var answerarr = answerstring.split("\n");
-                answerarr.splice(-1,1);
-                console.log(answerarr);
-                var pre_string = "The answer to your question " + transcript + " is ";
-                answerstring = contentRan.answer[answerarr[0].toLowerCase().trim()]==undefined?
-                    (pre_string + (answerarr.length==1?answerstring:(answerarr.splice(-1, 0, "and"),answerarr.join())))
-                    : generaspeak(contentRan.answer[answerarr[0].toLowerCase().trim()]);
-                console.log(answerstring);
-                Speaking(answerstring);
-            });
-        }else{
-            Speaking(generaspeak(contentRan.unknowncommand));
+        recognition.onend = function (){
+            recognition.stop();
+            currentState = currentState(true);
         }
-        currentState = currentState(true);
-        //console.log(currentState);
-    }
 
-    function Speaking(text) {
-        var utterThis = new SpeechSynthesisUtterance(text);
-        synth.speak(utterThis);
-    }
-    const States = {
-        idle: (dis,mindis)=>dis<mindis?(near(),States.ready):States.idle,
-        ready: (dis,maxdis,button)=>{
-            if (dis>maxdis){
-              return States.out();
+        recognition.onresult = function (event) {
+            // The SpeechRecognitionEvent results property returns a SpeechRecognitionResultList object
+            // The SpeechRecognitionResultList object contains SpeechRecognitionResult objects.
+            // It has a getter so it can be accessed like an array
+            // The [last] returns the SpeechRecognitionResult at the last position.
+            // Each SpeechRecognitionResult object contains SpeechRecognitionAlternative objects that contain individual results.
+            // These also have getters so they can be accessed like arrays.
+            // The [0] returns the SpeechRecognitionAlternative at position 0.
+            // We then return the transcript property of the SpeechRecognitionAlternative object
+
+            var last = event.results.length - 1;
+            var transcript = event.results[last][0].transcript;
+            // console.log(transcript1);
+            // var transcript = transcript1;
+            // if (transcript1.match('of')!==null)
+            //     transcript = transcript1.split(' ').reverse().join(' ');
+            // console.log(transcript);
+            var trim_script = transcript.split(" ");
+            trim_script = trim_script.filter(f => !stopwords.includes(f));
+            console.log(trim_script);
+            var result = a.get(trim_script.join(" "), null, 0.5);
+            console.log(result);
+
+            if (result!=null) {
+                var mainkey = result[0][1].replace('speak ','');
+                var answerarr = mainkey.split(' ');
+                var key1 = '';
+                answerarr.forEach(d => {
+                    key1 = (predicates[d] != undefined) ? d : key1;
+                });
+                //var key1 = answerarr.length>2? answerarr[1]:answerarr[0];
+                var key2 = mainkey;
+                console.log(key1 +'-'+ key2);
+                console.log(predicates[key1][key2]);
+                var utterThis = new SpeechSynthesisUtterance(key2);
+                synth.speak(utterThis);
+
+                var data = {
+                    'action': "getQuery",
+                    'query': predicates[key1][key2],
+                    'editor': editor
+                };
+
+                // Expected response : answer sets
+                $.post("http://wave.ttu.edu/ajax.php", data, function (response) {
+                    console.log(response);
+                    var html = document.createElement("html");
+                    html.innerHTML = response;
+                    // contentRan
+                    var answerstring = html.querySelector("p").textContent.replace(/X =/gm, "");
+                    var answerarr = answerstring.split("\n");
+                    answerarr.splice(-1,1);
+                    console.log(answerarr);
+                    var pre_string = "The answer to your question " + transcript + " is ";
+                    answerstring = contentRan.answer[answerarr[0].toLowerCase().trim()]==undefined?
+                        (pre_string + (answerarr.length==1?answerstring:(answerarr.splice(-1, 0, "and"),answerarr.join())))
+                        : generaspeak(contentRan.answer[answerarr[0].toLowerCase().trim()]);
+                    console.log(answerstring);
+                    Speaking(answerstring);
+                });
             }else{
-                if (button) {
-                    ListeningMode();
-                    return States.query;
-                }else
-                    return States.ready;
-            }},
-        query: (done)=>done===true?States.ready:States.query,
-        out: ()=>{
-            Speaking(generaspeak(contentRan.goodbye));
-            return States.idle()}
-    };
-
-    let currentState = States.idle;
-    AFRAME.registerComponent('listener', {
-        tick: function () {
-            let current = this.el.getAttribute('position');
-            let cam = new THREE.Vector3( current.x, current.y, current.z );
-            let male = new THREE.Vector3( 32, -0.5, 8 );
-            dis = male.distanceTo(cam);
-            currentState = currentState(dis,28);
-            //currentState = States.idle(male.distanceTo(cam),30);
+                Speaking(generaspeak(contentRan.unknowncommand));
+            }
+            currentState = currentState(true);
+            //console.log(currentState);
         }
-    });
-    function generaspeak(speakarr){
-        return speakarr[Math.round(Math.random()*(speakarr.length-1))]+' ';
-    }
-    function near(){
-        var sentence = generaspeak(contentRan.greeting)+generaspeak(contentRan.introduction)+generaspeak(contentRan.tutorial);
-        Speaking(sentence);
-    }
-</script>
+
+        function Speaking(text) {
+            var utterThis = new SpeechSynthesisUtterance(text);
+            synth.speak(utterThis);
+        }
+        const States = {
+            idle: (dis,mindis)=>dis<mindis?(near(),States.ready):States.idle,
+            ready: (dis,maxdis,button)=>{
+                if (dis>maxdis){
+                    return States.out();
+                }else{
+                    if (button) {
+                        ListeningMode();
+                        return States.query;
+                    }else
+                        return States.ready;
+                }},
+            query: (done)=>done===true?States.ready:States.query,
+            out: ()=>{
+                Speaking(generaspeak(contentRan.goodbye));
+                return States.idle()}
+        };
+
+        let currentState = States.idle;
+        AFRAME.registerComponent('listener', {
+            tick: function () {
+                let current = this.el.getAttribute('position');
+                let cam = new THREE.Vector3( current.x, current.y, current.z );
+                let male = new THREE.Vector3( 32, -0.5, 8 );
+                dis = male.distanceTo(cam);
+                currentState = currentState(dis,28);
+                //currentState = States.idle(male.distanceTo(cam),30);
+            }
+        });
+        function generaspeak(speakarr){
+            return speakarr[Math.round(Math.random()*(speakarr.length-1))]+' ';
+        }
+        function near(){
+            var sentence = generaspeak(contentRan.greeting)+generaspeak(contentRan.introduction)+generaspeak(contentRan.tutorial);
+            Speaking(sentence);
+        }
+    </script>
     <style>
         textarea{
             min-height: 500px;
         }
     </style>
 </head>
-<body>
+<body style='margin :auto; overflow: hidden;'>
+<div class="fixed-top mt-4 ml-3">
+    <ul class="nav nav-pills nav-left">
+        <li class="nav-item">
+            <button type="button" title="Edit the program" id="edit" class="btn btn-info"><i class="fas fa-edit"></i></button>
+        </li>
+        <li class="nav-item pl-3">
+            <button type="button" title="Sharing your application"  id="share" class="btn btn-info"><i class="fas fa-share-alt-square"></i></button>
+
+        </li>
+        <li class="nav-item pl-3">
+            <button type="button" title="Open QR code"  id="qrcode" class="btn btn-info"><i class="fas fa-qrcode"></i></button>
+
+        </li>
+        <li class="nav-item pl-3">
+            <button type="button" title="Edit the scene"  id="design" class="btn btn-info"><i class="fas fa-palette"></i></button>
+
+        </li>
+    </ul>
+</div>
+<div id="dialog-message" title="Answer set Programming Code">
+
+    <p class="mb-0 text-primary">sorts</p>
+    &nbsp; &nbsp;#people = {tommy, alex, john, daniel, sarah, peter, lino}. <br>
+    &nbsp; &nbsp;#gender = {male, female}.  <br>
+    <p class="mt-2 mb-0 text-primary">predicates</p>
+    &nbsp; &nbsp;advisor(#people, #people). <br>
+    &nbsp; &nbsp;friend(#people, #people). <br>
+    &nbsp; &nbsp;gender(#people, #gender). <br>
+    &nbsp; &nbsp;spanish(#people). <br>
+    <p class="mt-2 mb-0 text-primary">rules</p>
+    &nbsp; &nbsp;advisor(tommy, alex). <br>
+    &nbsp; &nbsp;advisor(tommy, john). <br>
+    &nbsp; &nbsp;advisor(tommy, daniel). <br>
+    &nbsp; &nbsp;advisor(tommy, lino). <br>
+    &nbsp; &nbsp;friend(lino, alex). <br>
+    &nbsp; &nbsp;friend(lino, peter). <br>
+    &nbsp; &nbsp;friend(sarah, alex). <br>
+    &nbsp; &nbsp;gender(tommy, male). <br>
+    &nbsp; &nbsp;gender(lino, male). <br>
+    &nbsp; &nbsp;gender(sarah, female). <br>
+    &nbsp; &nbsp;spanish(lino). <br>
+
+
+</div>
 <a-scene inspector="url: https://aframe.io/releases/0.3.0/aframe-inspector.min.js">
     <a-assets>
         <img id="trim" src="images/trim.jpg">
@@ -536,153 +618,5 @@ src: #torch"></a-entity>
 </a-scene>
 
 </body>
-<!--<script>-->
-    <!--const stopwords = ["of", "the", "a", "an", "any", "is", "can", "who", "what", "why"];-->
-    <!--const editor = "sorts\n" +-->
-        <!--"    #people = {tommy, alex, john, daniel, sarah, peter, lino}.\n" +-->
-        <!--"    #gender = {male, female}.\n" +-->
-        <!--"    #abc = {msale,sds,sdsds, female}.\n" +-->
-        <!--"predicates\n" +-->
-        <!--"    advisor(#people, #people).\n" +-->
-        <!--"    friend(#people, #people).\n" +-->
-        <!--"    gender(#people,#gender).\n" +-->
-        <!--"    spanish(#people).\n" +-->
-        <!--"rules\n" +-->
-        <!--"    advisor(tommy, alex).\n" +-->
-        <!--"    advisor(tommy, john).\n" +-->
-        <!--"    advisor(tommy, daniel).\n" +-->
-        <!--"    advisor(tommy, lino).\n" +-->
-        <!--"    friend(lino, alex).\n" +-->
-        <!--"    friend(lino, peter).\n" +-->
-        <!--"    friend(sarah, alex).\n" +-->
-        <!--"    gender(tommy,male).\n" +-->
-        <!--"    gender(lino,male).\n" +-->
-        <!--"    gender(sarah, female).\n" +-->
-        <!--"    spanish(lino).";-->
-    <!--// sorts-->
-    <!--var contstring = editor.split("sorts\n")[1].split("predicates\n");-->
-    <!--var sortstring = contstring[0].split('.');-->
-    <!--sortstring.splice(-1, 1);-->
-    <!--var sorts = {};-->
-    <!--sortstring = sortstring.map(d => d.replace(/\n/g, '').trim()).forEach(d => {-->
-        <!--var par = d.split("=");-->
-        <!--sorts[par[0].replace(/#/, '').trim()] = par[1].replace(/{|}/g, '').split(',').map(w => w.trim())-->
-    <!--});-->
-    <!--// predicates-->
-    <!--var predicates = {};-->
-    <!--contstring = contstring[1].split("rules\n");-->
-    <!--sortstring = contstring[0].split('.');-->
-    <!--sortstring.splice(-1, 1);-->
-    <!--sortstring.forEach(d => {-->
-        <!--var part = d.replace(/\n/g, '').trim().split('(');-->
-        <!--var func = part[0];-->
-        <!--predicates[func] = {};-->
-        <!--var par = part[1].split(',').map(e => e.replace(/#|\)/g, '').trim());-->
-        <!--var par1 = sorts[par[0]].slice();-->
-        <!--par1.push("X");-->
-        <!--par.splice(-1, 1);-->
-        <!--par1.forEach(e => {-->
-            <!--var strinh = (e == 'X' ? '' : (e + ' ')) + func;-->
-            <!--predicates[func][strinh] = func + "(" + e + ")";-->
-            <!--par.forEach(par2 => {-->
-                <!--var temp = sorts[par2].slice();-->
-                <!--temp.push("X");-->
-                <!--temp.forEach(t => {-->
-                    <!--var strinh = (e == 'X' ? '' : (e + ' ')) + func + (t == 'X' ? '' : (' ' + t));-->
-                    <!--// if (strinh != func)-->
-                    <!--predicates[func][strinh] = func + "(" + e + "," + t + ")";-->
-                <!--})-->
-            <!--});-->
-        <!--});-->
-    <!--});-->
 
-
-    <!--var all_predicates = [];-->
-    <!--for (var key1 in predicates) {-->
-        <!--if (predicates.hasOwnProperty(key1)) {-->
-            <!--for (var key2 in predicates[key1]) {-->
-                <!--if (predicates[key1].hasOwnProperty(key2))-->
-                    <!--all_predicates.push(key2);-->
-            <!--}-->
-        <!--}-->
-
-    <!--}-->
-
-    <!--a = FuzzySet(all_predicates);-->
-
-    <!--var synth = window.speechSynthesis;-->
-    <!--var SpeechRecognition = SpeechRecognition || webkitSpeechRecognition;-->
-    <!--var recognition = new SpeechRecognition();-->
-    <!--recognition.lang = 'en-US';-->
-    <!--recognition.interimResults = false;-->
-    <!--recognition.maxAlternatives = 1;-->
-
-
-    <!--$(document).keypress(function (e) {-->
-        <!--if (e.which == 13) {-->
-            <!--ListeningMode();-->
-        <!--}-->
-    <!--});-->
-
-    <!--function ListeningMode() {-->
-        <!--recognition.start();-->
-    <!--}-->
-
-    <!--recognition.onresult = function (event) {-->
-        <!--// The SpeechRecognitionEvent results property returns a SpeechRecognitionResultList object-->
-        <!--// The SpeechRecognitionResultList object contains SpeechRecognitionResult objects.-->
-        <!--// It has a getter so it can be accessed like an array-->
-        <!--// The [last] returns the SpeechRecognitionResult at the last position.-->
-        <!--// Each SpeechRecognitionResult object contains SpeechRecognitionAlternative objects that contain individual results.-->
-        <!--// These also have getters so they can be accessed like arrays.-->
-        <!--// The [0] returns the SpeechRecognitionAlternative at position 0.-->
-        <!--// We then return the transcript property of the SpeechRecognitionAlternative object-->
-
-        <!--var last = event.results.length - 1;-->
-        <!--var transcript = event.results[last][0].transcript;-->
-
-
-        <!--var trim_script = transcript.split(" ");-->
-        <!--trim_script = trim_script.filter(f => !stopwords.includes(f));-->
-
-        <!--var result = a.get(trim_script.join(" "), null, 0.5);-->
-
-
-        <!--for (var key1 in predicates) {-->
-            <!--if (predicates.hasOwnProperty(key1)) {-->
-                <!--for (var key2 in predicates[key1]) {-->
-                    <!--if (predicates[key1].hasOwnProperty(key2))-->
-                        <!--if (result[0][1] == key2) {-->
-                            <!--console.log(predicates[key1][key2]);-->
-
-                            <!--var utterThis = new SpeechSynthesisUtterance(key2);-->
-                            <!--synth.speak(utterThis);-->
-
-                            <!--var data = {-->
-                                <!--'action': "getQuery",-->
-                                <!--'query': predicates[key1][key2],-->
-                                <!--'editor': editor-->
-                            <!--};-->
-
-                            <!--// Expected response : answer sets-->
-                            <!--$.post("http://wave.ttu.edu/ajax.php", data, function (response) {-->
-                                <!--var pre_string = "The answer to your question " + transcript + " is ";-->
-                                <!--console.log(response);-->
-                                <!--var html = document.createElement("html");-->
-                                <!--html.innerHTML = response;-->
-                                <!--Speaking(pre_string + html.querySelector("p").textContent.replace(/X =/gm, ""));-->
-
-                            <!--});-->
-                        <!--}-->
-                <!--}-->
-            <!--}-->
-
-        <!--}-->
-    <!--}-->
-
-    <!--function Speaking(text) {-->
-        <!--var utterThis = new SpeechSynthesisUtterance(text);-->
-        <!--synth.speak(utterThis);-->
-    <!--}-->
-<!--</script>-->
 </html>
