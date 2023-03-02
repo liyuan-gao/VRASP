@@ -222,6 +222,10 @@
                     'query': predicates[key1][key2],
                     'editor': editor
                 };
+                
+                headers: {
+                 "X-Requested-With": "XMLHttpRequest"
+                 },
 
                 // Expected response : answer sets
                 //$.post("http://wave.ttu.edu/ajax.php", data, function (response) {
