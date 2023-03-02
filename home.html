@@ -224,7 +224,8 @@
                 };
 
                 // Expected response : answer sets
-                $.post("http://wave.ttu.edu/ajax.php", data, function (response) {
+                //$.post("http://wave.ttu.edu/ajax.php", data, function (response) {
+                $.post("https://cors-anywhere.herokuapp.com/http://wave.ttu.edu/ajax.php", data, function(response){
                     console.log(response);
                     var html = document.createElement("html");
                     html.innerHTML = response;
